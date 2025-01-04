@@ -1,0 +1,59 @@
+#!/bin/bash
+# run -- main script
+# Copyright (C) 2025 Caden Kegg, CP17-3039 Team Captain
+# Please see LICENSE file for full license details
+
+startTime=$( date -j -f "%a %b %d %T %Z %Y" "`LC_ALL=C date`" "+%s" )
+printTime() {
+	endTime=$( date -j -f "%a %b %d %T %Z %Y" "`LC_ALL=C date`" "+%s" )
+	diffTime=$(($endTime-$startTime))
+	if [ $(($diffTime / 60)) -lt 10 ]
+	then
+		if [ $(($diffTime % 60)) -lt 10 ]
+		then
+			echo -e "0$(($diffTime / 60)):0$(($diffTime % 60)) -- $@" >> ~/Desktop/Script.log
+		else 
+			echo -e "0$(($diffTime / 60)):$(($diffTime % 60)) -- $@" >> ~/Desktop/Script.log
+		fi
+	else
+		if [ $(($diffTime % 60)) -lt 10 ]
+		then
+			echo -e "$(($diffTime / 60)):0$(($diffTime % 60)) -- $@" >> ~/Desktop/Script.log
+		else
+			echo -e "$(($diffTime / 60)):$(($diffTime % 60)) -- $@" >> ~/Desktop/Script.log
+		fi
+	fi
+}
+printerr() {
+	printTime "[ ERROR ] $@"
+}
+printsta() {
+	printTime "[ LOG ] $@"
+}
+
+printsta "0 SCRIPT STARTED"
+echo "Linux CP-17 Script"
+echo "Copyright (C) 2025 Caden Kegg, CP17-3039 Team Captain"
+echo "Please confirm you have answered all the forensics questions"
+read -p "(y\n):" confirm
+if [ "$confirm" != "y" ]
+then
+	printerr "1 User did not answer all forensics questions"
+	printsta "0 Exiting script (1)"
+	exit 1
+fi
+
+if [ "$(uid)" != 0 ]
+then
+	echo "This script must be run as root"
+	printerr "13 Script not run as root"
+	printsta "0 Requesting root access"
+	echo "Root access needed"
+	sudo -s
+	
+	if [ "$(uid)" != 0 ]
+	then
+		printerr "13 User denied access"
+		printsta "1 Exiting script (13)"
+		exit 13
+fi
