@@ -4,32 +4,34 @@
 # Please see LICENSE file for full license details
 
 teamID="CP17-3039"
-startTime=$( date -j -f "%a %b %d %T %Z %Y" "`LC_ALL=C date`" "+%s" )
+startTime=$( date "+%s" )
 printTime() {
-	endTime=$( date -j -f "%a %b %d %T %Z %Y" "`LC_ALL=C date`" "+%s" )
+	endTime=$( date "+%s" )
 	diffTime=$(($endTime-$startTime))
 	if [ $(($diffTime / 60)) -lt 10 ]
 	then
 		if [ $(($diffTime % 60)) -lt 10 ]
 		then
-			echo -e "0$(($diffTime / 60)):0$(($diffTime % 60)) -- $@"
+			printf "0$(($diffTime / 60)):0$(($diffTime % 60)) -- $@"
 		else 
-			echo -e "0$(($diffTime / 60)):$(($diffTime % 60)) -- $@"
+			printf "0$(($diffTime / 60)):$(($diffTime % 60)) -- $@"
 		fi
 	else
 		if [ $(($diffTime % 60)) -lt 10 ]
 		then
-			echo -e "$(($diffTime / 60)):0$(($diffTime % 60)) -- $@"
+			printf "$(($diffTime / 60)):0$(($diffTime % 60)) -- $@"
 		else
-			echo -e "$(($diffTime / 60)):$(($diffTime % 60)) -- $@"
+			printf "$(($diffTime / 60)):$(($diffTime % 60)) -- $@"
 		fi
 	fi
 }
+
 printerr() {
-	printTime "[ ERROR ] $@" > stderr.log
+	printTime "[ ERROR $1 ] $2" | tee -a stderr.log
 }
+
 printsta() {
-	printTime "[ LOG ] $@" > stdout.log
+	printTime "[ LOG ] $@" | tee -a stdout.log
 }
 
 # Set up neccessary file tree
@@ -41,36 +43,37 @@ main() {
 	echo "Linux CP-17 Script"
 	echo "Copyright (C) 2025 Caden Kegg, CP17-3039 Team Captain"
 	echo "Please confirm you have answered all the forensics questions"
-	read -p "(y\n):" confirm
+	read -p "(y/n):" confirm
 	if [ "$confirm" != "y" ]
 	then
-		printerr "1 User did not answer all forensics questions"
+		printerr 1 "User did not answer all forensics questions"
 		printsta "0 Exiting script (1)"
 		echo "Exiting script"
 		exit 1
 	fi
 
-	if [ "$(uid)" != 0 ]
+	if [ "$( id -u )" != 0 ]
 	then
 		echo "This script must be run as root"
-		printerr "13 Script not run as root"
+		printerr 13 "Script not run as root"
 		printsta "0 Requesting root access"
 		echo "Root access needed"
 		sudo -s
 		
-		if [ "$(uid)" != 0 ]
+		if [ "$( id -u )" != 0 ]
 		then
-			printerr "13 User denied access"
+			printerr 13 "User denied access"
 			printsta "1 Exiting script (13)"
 			exit 13
+		fi
 	fi
 
 	# Get users from readme
 	printsta "0 Reading users from README"
 
-	read -p "Enter README file URL: " readmeURL
+	read -p "Enter README file URL: " readmeURL 2>> stderr.log
 
-	wget "$readmeURL" -O README${startTime}.aspx
+	wget "$readmeURL" -O README${startTime}.aspx --debug --verbose --no-netrc --timestamping --append-output=wget.log 2>> stderr.log
 
 	if [ $? -ne 0 ]
 	then
@@ -79,22 +82,27 @@ main() {
 		exit 2
 	fi
 
-	cat example_readme.aspx | \
-		grep --color=never "<pre>" --after-context 1000 | \
-		grep --color=never "</pre>" --before-context 1000 | \
-		sed "1,4d;/password: /d; /<b>Authorized Users:<\/b>/d; /<\/pre>/d" | \
-		sed  "s/\r//g;/^$/d" | \
-		sort | \
-		uniq > readme_userlist.txt
+	cat README${startTime}.aspx 2>> stderr.log | \
+		grep --color=never "<pre>" --after-context 1000 2>> stderr.log | \
+		grep --color=never "</pre>" --before-context 1000 2>> stderr.log | \
+		sed "1,4d;/password: /d; /<b>Authorized Users:<\/b>/d; /<\/pre>/d" 2>> stderr.log | \
+		sed  "s/\r//g;/^$/d" 2>> stderr.log | \
+		sort 2>> stderr.log | \
+		uniq > readme_userlist.txt 2>> stderr.log
 	
-	apt purge -y -qq netcat netcat-openbsd netcat-traditional ncat pnetcat socat sock socket sbd
+	apt purge -y -qq netcat netcat-openbsd netcat-traditional ncat pnetcat socat sock socket sbd 2>> stderr.log
 
 	printsta "0 All instances of netcat removed"
 
 	# Get actual users and compare with `readme_userlist.txt`
 	printsta "0 Getting actual users"
-	cat /etc/passwd | cut -d: -f1 | sort | uniq > actual_userlist.txt
+	cat /etc/passwd 2>> stderr.log | \
+	cut -d: -f1 2>> stderr.log | \
+	sort 2>> stderr.log | \
+	uniq > actual_userlist.txt 2>> stderr.log
 
-	comm -13i readme_userlist.txt actual_userlist.txt | uniq | tr "\t" "\0" | sed "/^$/
-	d" > user_diff.txt
+	comm -13 readme_userlist.txt actual_userlist.txt 2>> stderr.log | \
+	uniq 2>> stderr.log | \
+	tr "\t" "\n" 2>> stderr.log | \
+	sed "/^$/d" > user_diff.txt 2>> stderr.log
 }
