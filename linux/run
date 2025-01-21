@@ -3,8 +3,43 @@
 # Copyright (C) 2024-2025 Caden Kegg, CP17-3039 Team Captain
 # Please see LICENSE file for full license details
 
+# This script performs the following tasks:
+# 1. Sets up necessary file tree in /tmp directory using the team ID.
+# 2. Prompts the user to confirm if all forensics questions have been answered.
+# 3. Checks if the script is run as root, and if not, requests root access.
+# 4. Downloads a README file from a provided URL and extracts a list of authorized users.
+# 5. Removes all instances of netcat and related tools.
+# 6. Compares the list of authorized users from the README with the actual users on the system.
+# 7. Removes any unauthorized users found on the system.
+
+# Functions:
+# - printTime: Calculates and prints the elapsed time since the script started.
+# - printerr: Logs error messages with a timestamp to stderr.log.
+# - printsta: Logs status messages with a timestamp to stdout.log.
+
+# Variables:
+# - teamID: The team ID for the CyberPatriot competition.
+# - startTime: The start time of the script.
+# - ERRLOG: Temporary file for logging errors.
+# - OUTLOG: Temporary file for logging output.
+
+# Main function:
+# - Sets up the file tree and changes to the team directory.
+# - Prompts the user to confirm if all forensics questions have been answered.
+# - Checks if the script is run as root and requests root access if not.
+# - Downloads the README file and extracts the list of authorized users.
+# - Removes all instances of netcat and related tools.
+# - Compares the list of authorized users with the actual users on the system.
+# - Removes any unauthorized users found on the system.
+
 teamID="CP17-3039"
 startTime=$( date "+%s" )
+mkdir -p /tmp/${teamID}
+cd /tmp/${teamID}
+BACK="$(mktemp -d --tmpdir /tmp/$teamID backup-XXXXXXXXXX)"
+cp /etc/passwd 
+ERRLOG="$(mktemp --tmpdir /tmp/$teamID stderr.log-XXXXXXXXXX)" || bash -c "echo 'Failed to create error logfile' && exit 1"
+OUTLOG="$(mktemp --tmpdir /tmp/$teamID stdout.log-XXXXXXXXXX)" || bash -c "echo 'Failed to create output logfile' && exit 1"
 printTime() {
 	endTime=$( date "+%s" )
 	diffTime=$(($endTime-$startTime))
@@ -26,26 +61,33 @@ printTime() {
 	fi
 }
 
-ERRLOG=$(mktemp stderr.log) || bash -c "echo 'Failed to create error logfile' && exit 1"
-OUTLOG=$(mktemp stdout.log) || bash -c "echo 'Failed to create output logfile' && exit 1"
-
 printerr() {
-	$(printTime "[ ERROR $1 ] $2") | tee -a $ERRLOG
+	printTime "[ ERROR $1 ] $2" | tee -a $ERRLOG
 }
 
 printsta() {
-	$(printTime "[ LOG ] $@") | tee -a $OUTLOG
+	printTime "[ LOG ] $@" | tee -a $OUTLOG
 }
 
-# Set up neccessary file tree
-mkdir -p /tmp/${teamID}
-cd /tmp/${teamID}
+
+mktemp -d backup-XXXXXXXXXX
+cp /etc/passwd 
 
 main() {
 	printsta "0 SCRIPT STARTED"
 	echo "---------------- Linux CP-17 Script -----------------"
 	echo "Copyright (C) 2025 Caden Kegg, CP17-3039 Team Captain"
+	echo "This script is distributed via GitHub under"
+	echo "the GNU General Public License v3 with no warranty."
+	echo "Use at your own risk. The developer assumes no liability"
+	echo "for any damage, data loss, or misuse of this script."
+	echo "See the license file for detailed terms."
+	echo
+	echo "This script is not affiliated with, nor endorsed by,"
+	echo "the CyberPatriot program or the Air and Space Forces"
+	echo "Association (AFA)."
 	echo "-----------------------------------------------------"
+	echo
 	echo "Please confirm you have answered all the forensics questions"
 
 	read -p "(y/n):" confirm
@@ -63,7 +105,7 @@ main() {
 		printerr 13 "Script not run as root"
 		printsta "0 Requesting root access"
 		echo "Root access needed"
-		sudo "$0" "$@"
+		exec sudo "$0" "$@"
 		
 		if [ "$( id -u )" != 0 ]
 		then
@@ -76,13 +118,13 @@ main() {
 	# Get users from readme
 	printsta "0 Reading users from README"
 
-	read -p "Enter README file URL: " readmeURL 2>> stderr.log
+	read -r -p "Enter README file URL: " readmeURL 2>> stderr.log
 
 	wget "$readmeURL" -O README${startTime}.aspx --debug --verbose --no-netrc --timestamping --append-output=wget.log 2>> stderr.log
 
 	if [ $? -ne 0 ]
 	then
-		printerr "2 Failed to download README"
+		printerr 2 "Failed to download README"
 		printsta "1 Exiting script (2)"
 		exit 2
 	fi
@@ -90,7 +132,7 @@ main() {
 	cat README${startTime}.aspx 2>> stderr.log | \
 		grep --color=never "<pre>" --after-context 1000 2>> stderr.log | \
 		grep --color=never "</pre>" --before-context 1000 2>> stderr.log | \
-		sed "1,4d;/password: /d; /<b>Authorized Users:<\/b>/d; /<\/pre>/d" 2>> stderr.log | \
+		sed "1,4d;/password: /d; /<b>Authorized Users:<\/b>/d; /<\/pre>/d; /\(you\)/d" 2>> stderr.log | \
 		sed  "s/\r//g;/^$/d" 2>> stderr.log | \
 		sort 2>> stderr.log | \
 		uniq > readme_userlist.txt 2>> stderr.log
@@ -111,7 +153,10 @@ main() {
 	tr "\t" "\n" 2>> stderr.log | \
 	sed "/^$/d" > user_diff.txt 2>> stderr.log
 
-	while IFS= read -r user
+	# Save original IFS
+	ORIGINAL_IFS=$IFS
+	IFS=
+	while read -r user
 	do
 		if id "$user" &>/dev/null
 		then
@@ -127,6 +172,21 @@ main() {
 			printsta "0 User $user does not exist"
 		fi
 	done < user_diff.txt
+	# Restore original IFS
+	IFS=$ORIGINAL_IFS
+
+	current_user=${SUDO_USER:-$(whoami)}
+	while IFS=: read -r username _; do
+		if [ "$username" != "$current_user" ]; then
+			echo "Changing password for user: $username"
+			echo "$username:J1gnleBe11\$B@tm@n\$M3||s" | chpasswd
+			if [ $? -eq 0 ]; then
+				printsta "0 Successfully changed password for user: $username"
+			else
+				printerr 4 "Failed to change password for user: $username"
+			fi
+		fi
+	done < /etc/passwd
 }
 
 main "$@"
