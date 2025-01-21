@@ -110,6 +110,23 @@ main() {
 	uniq 2>> stderr.log | \
 	tr "\t" "\n" 2>> stderr.log | \
 	sed "/^$/d" > user_diff.txt 2>> stderr.log
+
+	while IFS= read -r user
+	do
+		if id "$user" &>/dev/null
+		then
+			printsta "0 Removing unauthorized user: $user"
+			userdel -r "$user" 2>> stderr.log
+			if [ $? -eq 0 ]
+			then
+				printsta "0 Successfully removed user: $user"
+			else
+				printerr 3 "Failed to remove user: $user"
+			fi
+		else
+			printsta "0 User $user does not exist"
+		fi
+	done < user_diff.txt
 }
 
 main "$@"
