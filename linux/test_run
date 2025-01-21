@@ -1,0 +1,7 @@
+#!/bin/bash
+# test_run -- test script for run script
+
+bats --tap --print-output-on-failure --show-output-of-passing-tests --timing --gather-test-outputs-in ./.bats_output run.bats
+if [ $? -ne 0 ]; then
+	echo "One or more tests failed. Check the .bats_output directory for more information."
+fi

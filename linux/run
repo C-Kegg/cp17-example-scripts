@@ -26,12 +26,15 @@ printTime() {
 	fi
 }
 
+ERRLOG=$(mktemp stderr.log) || bash -c "echo 'Failed to create error logfile' && exit 1"
+OUTLOG=$(mktemp stdout.log) || bash -c "echo 'Failed to create output logfile' && exit 1"
+
 printerr() {
-	printTime "[ ERROR $1 ] $2" | tee -a stderr.log
+	$(printTime "[ ERROR $1 ] $2") | tee -a $ERRLOG
 }
 
 printsta() {
-	printTime "[ LOG ] $@" | tee -a stdout.log
+	$(printTime "[ LOG ] $@") | tee -a $OUTLOG
 }
 
 # Set up neccessary file tree
@@ -40,9 +43,11 @@ cd /tmp/${teamID}
 
 main() {
 	printsta "0 SCRIPT STARTED"
-	echo "Linux CP-17 Script"
+	echo "---------------- Linux CP-17 Script -----------------"
 	echo "Copyright (C) 2025 Caden Kegg, CP17-3039 Team Captain"
+	echo "-----------------------------------------------------"
 	echo "Please confirm you have answered all the forensics questions"
+
 	read -p "(y/n):" confirm
 	if [ "$confirm" != "y" ]
 	then
@@ -58,7 +63,7 @@ main() {
 		printerr 13 "Script not run as root"
 		printsta "0 Requesting root access"
 		echo "Root access needed"
-		sudo -s
+		sudo "$0" "$@"
 		
 		if [ "$( id -u )" != 0 ]
 		then
@@ -106,3 +111,5 @@ main() {
 	tr "\t" "\n" 2>> stderr.log | \
 	sed "/^$/d" > user_diff.txt 2>> stderr.log
 }
+
+main "$@"

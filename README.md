@@ -10,6 +10,10 @@ This project is licensed under the GNU General Public License (GPL). For more de
 
 Feel free to explore and use the scripts provided in this repository. Contributions and improvements are welcome.
 
+## Testing
+This project uses `bats` for testing. On Linux, `bats` can be installed by running `sudo apt install bats`. Use Homebrew to install on macOS. After installing, navigate to the root directory for this project (typically _cp-17-example-scripts_) and run the `test_run` file to test the script. Make sure to run it from `cp-17-example-scripts`.
+I'd recommend testing on a virtual machine to prevent damages to your personal device.
+
 ## Contact
 
 For any questions or further information, please contact the CyberPatriot team 17-3039 captain at cadenkegg@icloud.com.
