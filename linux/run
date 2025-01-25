@@ -49,14 +49,15 @@ teamID="CP17-3039"
 startTime=$( date "+%s" )
 mkdir -p /tmp/${teamID}
 cd /tmp/${teamID}
-BACK="$(mktemp -d --tmpdir /tmp/$teamID backup-XXXXXXXXXX)"
-PFILEBACK="$(mktemp -d --tmpdir /tmp/$teamID/$BACK pfilebackup-XXXXXXXXXX)"
+BACK="$(mktemp -d /tmp/$teamID/backup-XXXXXXXXXX)"
+PFILEBACK="$(mktemp -d $BACK/pfilebackup-XXXXXXXXXX)"
+
 for file in passwd groups shadow gshadow sudoers; do
 	cp /etc/$file $BACK/$file.bak
 	chmod 700 $BACK/$file.bak
 done
-ERRLOG="$(mktemp --tmpdir /tmp/$teamID stderr.log-XXXXXXXXXX)" || bash -c "echo 'Failed to create error logfile' && exit 1"
-OUTLOG="$(mktemp --tmpdir /tmp/$teamID stdout.log-XXXXXXXXXX)" || bash -c "echo 'Failed to create output logfile' && exit 1"
+ERRLOG="$(mktemp /tmp/$teamID/stderr.log-XXXXXXXXXX)" || bash -c "echo 'Failed to create error logfile' && exit 1"
+OUTLOG="$(mktemp /tmp/$teamID/stdout.log-XXXXXXXXXX)" || bash -c "echo 'Failed to create output logfile' && exit 1"
 printTime() {
 	endTime=$( date "+%s" )
 	diffTime=$(($endTime-$startTime))
@@ -221,8 +222,23 @@ main() {
 	sudo apt-get install clamtk -y	
 	wait
 
+	# Prohibited files
+
+	echo "Locating, backing up, and removing prohibited file types"
+	printsta "0 Locating, backing up, and removing prohibited file types"
+	pFiles
+
+
+	echo "exit 0" > /etc/rc.local
+	for file in $(ls /var/spool/cron/crontabs/*); do
+		echo "0 Backing up crontab file: $file"
+		# cp /var/spool/cron/crontabs/$file $BACK/$file.bak
+		# echo "exit 0" > $file
+	done
+
 
 }
+
 pFiles() {
 	printsta "0 Locating prohibted files"
 
@@ -258,7 +274,7 @@ pFiles() {
 	while IFS=: read -r file; do
 		if [ -f "$file" ]; then
 			printsta "0 Backing up prohibited file: $file"
-			cp "$file" "/tmp/$teamID/$BACK/$PFILEBACK"
+			cp "$file" "$PFILEBACK/"
 			printsta "0 Deleting prohibited file: $file"
 			rm -f "$file"
 		fi
@@ -267,5 +283,6 @@ pFiles() {
 	
 	cat prohibited_files.log
 }
+
 main "$@"
 alias ls="ls --color=always -AFiG"
