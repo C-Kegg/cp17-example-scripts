@@ -1,7 +1,20 @@
 #!/bin/bash
 # run -- main script
-# Copyright (C) 2024-2025 Caden Kegg, CP17-3039 Team Captain
-# Please see LICENSE file for full license details
+"""
+Copyright (C) 2024-2025  Caden Kegg, CP17-3039 Team Captain
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+"""
+## You should have received a copy of the GNU General Public License
+## along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # This script performs the following tasks:
 # 1. Sets up necessary file tree in /tmp directory using the team ID.
@@ -37,7 +50,11 @@ startTime=$( date "+%s" )
 mkdir -p /tmp/${teamID}
 cd /tmp/${teamID}
 BACK="$(mktemp -d --tmpdir /tmp/$teamID backup-XXXXXXXXXX)"
-cp /etc/passwd 
+PFILEBACK="$(mktemp -d --tmpdir /tmp/$teamID/$BACK pfilebackup-XXXXXXXXXX)"
+for file in passwd groups shadow gshadow sudoers; do
+	cp /etc/$file $BACK/$file.bak
+	chmod 700 $BACK/$file.bak
+done
 ERRLOG="$(mktemp --tmpdir /tmp/$teamID stderr.log-XXXXXXXXXX)" || bash -c "echo 'Failed to create error logfile' && exit 1"
 OUTLOG="$(mktemp --tmpdir /tmp/$teamID stdout.log-XXXXXXXXXX)" || bash -c "echo 'Failed to create output logfile' && exit 1"
 printTime() {
@@ -69,16 +86,12 @@ printsta() {
 	printTime "[ LOG ] $@" | tee -a $OUTLOG
 }
 
-
-mktemp -d backup-XXXXXXXXXX
-cp /etc/passwd 
-
 main() {
 	printsta "0 SCRIPT STARTED"
 	echo "---------------- Linux CP-17 Script -----------------"
 	echo "Copyright (C) 2025 Caden Kegg, CP17-3039 Team Captain"
-	echo "This script is distributed via GitHub under"
-	echo "the GNU General Public License v3 with no warranty."
+	echo "This script is distributed via GitHub under the GNU"
+	echo "General Public License v3 with no warranty or guarantees."
 	echo "Use at your own risk. The developer assumes no liability"
 	echo "for any damage, data loss, or misuse of this script."
 	echo "See the license file for detailed terms."
@@ -91,7 +104,7 @@ main() {
 	echo "Please confirm you have answered all the forensics questions"
 
 	read -p "(y/n):" confirm
-	if [ "$confirm" != "y" ]
+	if [ ! "$confirm" =~ "^[yY]" ]
 	then
 		printerr 1 "User did not answer all forensics questions"
 		printsta "0 Exiting script (1)"
@@ -114,11 +127,13 @@ main() {
 			exit 13
 		fi
 	fi
-
+	unalias -a
 	# Get users from readme
 	printsta "0 Reading users from README"
 
 	read -r -p "Enter README file URL: " readmeURL 2>> stderr.log
+
+	printsta "0 Downloading README file from $readmeURL"
 
 	wget "$readmeURL" -O README${startTime}.aspx --debug --verbose --no-netrc --timestamping --append-output=wget.log 2>> stderr.log
 
@@ -144,36 +159,36 @@ main() {
 	# Get actual users and compare with `readme_userlist.txt`
 	printsta "0 Getting actual users"
 	cat /etc/passwd 2>> stderr.log | \
-	cut -d: -f1 2>> stderr.log | \
-	sort 2>> stderr.log | \
-	uniq > actual_userlist.txt 2>> stderr.log
+	 cut -d: -f1 2>> stderr.log | \
+	 sort 2>> stderr.log | \
+	 uniq > actual_userlist.txt 2>> stderr.log
 
 	comm -13 readme_userlist.txt actual_userlist.txt 2>> stderr.log | \
-	uniq 2>> stderr.log | \
-	tr "\t" "\n" 2>> stderr.log | \
-	sed "/^$/d" > user_diff.txt 2>> stderr.log
+	 uniq 2>> stderr.log | \
+	 tr "\t" "\n" 2>> stderr.log | \
+	 sed "/^$/d" > user_diff.txt 2>> stderr.log
 
 	# Save original IFS
-	ORIGINAL_IFS=$IFS
-	IFS=
-	while read -r user
-	do
-		if id "$user" &>/dev/null
-		then
-			printsta "0 Removing unauthorized user: $user"
-			userdel -r "$user" 2>> stderr.log
-			if [ $? -eq 0 ]
-			then
-				printsta "0 Successfully removed user: $user"
-			else
-				printerr 3 "Failed to remove user: $user"
-			fi
-		else
-			printsta "0 User $user does not exist"
-		fi
-	done < user_diff.txt
-	# Restore original IFS
-	IFS=$ORIGINAL_IFS
+	# ORIGINAL_IFS=$IFS
+	# IFS=
+	# while read -r user
+	# do
+	# 	if id "$user" &>/dev/null
+	# 	then
+	# 		printsta "0 Removing unauthorized user: $user"
+	# 		userdel -r "$user" 2>> stderr.log
+	# 		if [ $? -eq 0 ]
+	# 		then
+	# 			printsta "0 Successfully removed user: $user"
+	# 		else
+	# 			printerr 3 "Failed to remove user: $user"
+	# 		fi
+	# 	else
+	# 		printsta "0 User $user does not exist"
+	# 	fi
+	# done < user_diff.txt
+	# # Restore original IFS
+	# IFS=$ORIGINAL_IFS
 
 	current_user=${SUDO_USER:-$(whoami)}
 	while IFS=: read -r username _; do
@@ -187,6 +202,70 @@ main() {
 			fi
 		fi
 	done < /etc/passwd
-}
 
+	echo "Installing updates and such"
+	printsta "0 Installing updates and such"
+
+	sudo add-apt-repository -y ppa:libreoffice/ppa
+	wait
+	sudo apt-get update -y
+	wait
+	sudo apt-get upgrade -y
+	wait
+	sudo apt-get dist-upgrade -y
+	wait
+	killall firefox
+	wait
+	sudo apt-get --purge --reinstall install firefox -y
+	wait
+	sudo apt-get install clamtk -y	
+	wait
+
+
+}
+pFiles() {
+	printsta "0 Locating prohibted files"
+
+	## Media files
+	find / -name "*.mov" \
+		-or -name "*.mp4" \
+		-or -name "*.mp3" \
+		-or -name "*.wav" \
+		-type f >> prohibited_files.log
+
+	## Pictures
+	# find / -name "*.png" -type f >> prohibited_files.log
+	# find / -name "*.gif" -type f >> prohibited_files.log
+    find / -name "*.jpg" \
+		-or -name "*.jpeg" \
+		-type f >> prohibited_files.log
+
+	## Other Files
+	find / -name "*.tar.gz" \
+		-or -name "*.php" \
+		-or -name "*backdoor*.*" \
+		-type f >> prohibited_files.log
+
+	## Items without groups
+	find / -nogroup >> prohibited_files.log
+
+	if [ ! -s prohibited_files.log ]
+	then
+		printsta "0 No prohibited files found"
+		return
+	fi
+
+	while IFS=: read -r file; do
+		if [ -f "$file" ]; then
+			printsta "0 Backing up prohibited file: $file"
+			cp "$file" "/tmp/$teamID/$BACK/$PFILEBACK"
+			printsta "0 Deleting prohibited file: $file"
+			rm -f "$file"
+		fi
+	done < prohibited_files.log
+
+	
+	cat prohibited_files.log
+}
 main "$@"
+alias ls="ls --color=always -AFiG"
